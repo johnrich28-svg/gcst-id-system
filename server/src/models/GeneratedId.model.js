@@ -15,7 +15,7 @@ const generatedIdSchema = new mongoose.Schema({
   frontPdfPath: String,
   backPdfPath: String,
   issuedAt: { type: Date, default: Date.now },
-  issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null },
   printed: { type: Boolean, default: false }
 });
 

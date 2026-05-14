@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import StaffSignoffModal from '../../components/shared/StaffSignoffModal';
 import { getRequestDetails, validateRequest, generateIdCard, confirmPayment } from '../../services/admin.service';
 import { getStatusConfig } from '../../utils/statusColors';
 
@@ -13,8 +14,9 @@ const RequestDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [request, setRequest] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]           = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [generateSignoff, setGenerateSignoff] = useState(false); // controls sign-off modal
 
   const fetchDetails = async () => {
     try {
@@ -70,8 +72,30 @@ const RequestDetails = () => {
     }
   };
 
+  const handleGenerateSignoff = async (staffId, staffName) => {
+    setGenerateSignoff(false);
+    setActionLoading(true);
+    try {
+      await generateIdCard(id, staffId);
+      await fetchDetails();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to generate ID card.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Staff Sign-off Modal for Generate ID */}
+      <StaffSignoffModal
+        isOpen={generateSignoff}
+        onClose={() => setGenerateSignoff(false)}
+        onConfirm={handleGenerateSignoff}
+        title="Generate ID Card"
+        description="To generate this student's ID card, please select your name and enter your PIN to sign off."
+      />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -127,17 +151,7 @@ const RequestDetails = () => {
           {(request.status === 'APPROVED' || request.status === 'GENERATED') && (
             <Button
               className="bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20"
-              onClick={async () => {
-                setActionLoading(true);
-                try {
-                  await generateIdCard(id);
-                  await fetchDetails();
-                } catch (err) {
-                  alert(err.response?.data?.message || 'Failed to generate ID card.');
-                } finally {
-                  setActionLoading(false);
-                }
-              }}
+              onClick={() => setGenerateSignoff(true)}
               disabled={actionLoading}
             >
               {actionLoading ? <Loader2 className="animate-spin" /> : <Printer size={18} className="mr-2" />}

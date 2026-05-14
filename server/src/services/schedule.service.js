@@ -93,7 +93,7 @@ export const autoBatchGeneratedIds = async () => {
 export const getBatches = async (filters = {}) => {
   return await Batch.find(filters)
     .populate('requestIds')
-    .populate('releasedBy', 'name email')
+    .populate('releasedBy', 'name')
     .sort({ createdAt: -1 });
 };
 
@@ -132,7 +132,7 @@ export const releaseBatch = async (batchId, releasedById = null) => {
     }
   );
 
-  return await batch.populate('releasedBy', 'name email');
+  return await batch.populate('releasedBy', 'name');
 };
 
 /**

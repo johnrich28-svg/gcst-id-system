@@ -9,7 +9,7 @@ const batchSchema = new mongoose.Schema({
   course: { type: String, default: null },
   status: { type: String, enum: ['PENDING', 'RELEASED'], default: 'PENDING' },
   releaseDate: { type: Date },
-  releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null },
   releasedAt: { type: Date, default: null },
   requestIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'IdRequest' }],
   quota: { type: Number, required: true }

@@ -40,8 +40,8 @@ export const updateBatchReleaseDate = async (id, releaseDate) => {
   return response.data;
 };
 
-export const generateIdCard = async (requestId) => {
-  const response = await api.post(`/id/generate/${requestId}`);
+export const generateIdCard = async (requestId, staffId = null) => {
+  const response = await api.post(`/id/generate/${requestId}`, { staffId });
   return response.data;
 };
 

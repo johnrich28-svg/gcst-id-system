@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, Users, Clock, CheckCircle, Play, RefreshCw, ChevronDown, ChevronUp, Info, Download, UserCheck } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
+import StaffSignoffModal from '../../components/shared/StaffSignoffModal';
 import { getBatches, runAutoBatch, updateBatchReleaseDate } from '../../services/admin.service';
 import api from '../../services/api';
 
@@ -30,6 +31,7 @@ const Schedule = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [expandedBatch, setExpandedBatch] = useState(null);
   const [toast, setToast] = useState(null); // { type: 'success'|'info'|'error', message }
+  const [signoff, setSignoff] = useState(null); // { batchId } — pending release
 
   const fetchBatches = async () => {
     try {
@@ -87,13 +89,21 @@ const Schedule = () => {
     }
   };
 
-  const handleReleaseBatch = async (id) => {
-    if (!window.confirm('Mark this batch as released? This is final.')) return;
+  // Opens the sign-off modal instead of releasing directly
+  const handleReleaseBatch = (id) => {
+    if (!window.confirm('Are you sure you want to release this batch? This is final.')) return;
+    setSignoff({ batchId: id });
+  };
+
+  // Called after staff PIN is verified
+  const handleSignoffConfirm = async (staffId, staffName) => {
+    setSignoff(null);
     try {
-      await api.put(`/admin/batches/${id}/release`);
+      await api.put(`/admin/batches/${signoff.batchId}/release`, { staffId });
       await fetchBatches();
+      showToast('success', `✅ Batch released and signed off by ${staffName}`);
     } catch (error) {
-      alert('Failed to release batch.');
+      showToast('error', error.response?.data?.message || 'Failed to release batch.');
     }
   };
 
@@ -109,6 +119,15 @@ const Schedule = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Staff Sign-off Modal */}
+      <StaffSignoffModal
+        isOpen={!!signoff}
+        onClose={() => setSignoff(null)}
+        onConfirm={handleSignoffConfirm}
+        title="Release Batch"
+        description="To release this batch, please select your name and enter your personal PIN to confirm."
+      />
+
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl text-sm font-bold transition-all animate-fade-in ${

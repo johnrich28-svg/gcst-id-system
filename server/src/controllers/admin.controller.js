@@ -57,7 +57,8 @@ export const updateBatchRelease = async (req, res, next) => {
 export const releaseBatch = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const batch = await scheduleService.releaseBatch(id, req.user._id);
+    const { staffId } = req.body; // provided by the sign-off modal
+    const batch = await scheduleService.releaseBatch(id, staffId || null);
     res.status(200).json(new ApiResponse(200, batch));
   } catch (error) {
     next(error);

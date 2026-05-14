@@ -8,7 +8,8 @@ import fs from 'fs';
 export const generateId = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const generatedId = await idGeneratorService.generateIdCard(id, req.user._id);
+    const { staffId } = req.body; // provided by the sign-off modal
+    const generatedId = await idGeneratorService.generateIdCard(id, staffId || null);
     res.status(200).json(new ApiResponse(200, generatedId, 'ID generated successfully'));
   } catch (error) {
     next(error);

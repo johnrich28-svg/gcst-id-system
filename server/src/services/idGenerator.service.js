@@ -429,7 +429,7 @@ export const generateIdCard = async (requestId, issuedById = null) => {
   }
   request.status = 'GENERATED';
   await request.save();
-  return rec.populate('issuedBy', 'name email');
+  return rec.populate('issuedBy', 'name');
 };
 
 export const regeneratePdf = async (generatedIdDocId) => {
@@ -455,5 +455,5 @@ export const regeneratePdf = async (generatedIdDocId) => {
 
 export const getGeneratedIds = async (filters = {}) =>
   GeneratedId.find(filters)
-    .populate('issuedBy', 'name email')
+    .populate('issuedBy', 'name')
     .sort({ issuedAt: -1 });
