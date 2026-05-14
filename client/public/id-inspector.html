@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ID Template Pixel Inspector</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; color: #eee; font-family: monospace; display: flex; gap: 16px; padding: 16px; }
+    .panel { display: flex; flex-direction: column; gap: 8px; }
+    h2 { color: #00d4ff; font-size: 14px; margin-bottom: 4px; }
+    canvas { cursor: crosshair; border: 2px solid #00d4ff; display: block; }
+    .info-box {
+      background: #0d0d1a;
+      border: 1px solid #00d4ff33;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 12px;
+      min-width: 280px;
+    }
+    .coord { color: #00ff88; font-size: 16px; font-weight: bold; }
+    .color-swatch {
+      display: inline-block; width: 20px; height: 20px;
+      border: 1px solid #fff; vertical-align: middle; margin-left: 6px;
+    }
+    .log { 
+      background: #0d0d1a; border: 1px solid #333; border-radius: 6px;
+      padding: 8px; height: 300px; overflow-y: auto; font-size: 11px;
+    }
+    .log-entry { padding: 2px 0; border-bottom: 1px solid #1a1a2e; color: #aaa; }
+    .log-entry .lx { color: #00ff88; }
+    .log-entry .ly { color: #ff6b6b; }
+    .btn { 
+      background: #00d4ff22; border: 1px solid #00d4ff; color: #00d4ff;
+      padding: 6px 14px; border-radius: 4px; cursor: pointer; font-family: monospace;
+    }
+    .btn:hover { background: #00d4ff44; }
+    .tab-bar { display: flex; gap: 4px; }
+    .tab { padding: 6px 16px; border-radius: 4px 4px 0 0; cursor: pointer; border: 1px solid #333; }
+    .tab.active { background: #00d4ff22; border-color: #00d4ff; color: #00d4ff; }
+    .zoom-box { 
+      border: 1px solid #00d4ff33; border-radius: 6px;
+      background: #000; image-rendering: pixelated;
+    }
+    .marker-list { max-height: 200px; overflow-y: auto; }
+    .marker { 
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 3px 6px; border-bottom: 1px solid #1a1a2e; font-size: 11px;
+    }
+    .marker-label { color: #ffd700; }
+    .marker-coord { color: #00ff88; }
+  </style>
+</head>
+<body>
+
+<div class="panel">
+  <h2>📐 GCST ID Template Pixel Inspector</h2>
+
+  <div class="tab-bar">
+    <div class="tab active" id="tab-front" onclick="switchTemplate('front')">FRONT</div>
+    <div class="tab" id="tab-back" onclick="switchTemplate('back')">BACK</div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="panel" style="flex:1; min-width:300px;">
+  <div class="info-box">
+    <div>Cursor Position:</div>
+    <div class="coord" id="pos">X: — &nbsp; Y: —</div>
+    <div style="margin-top:6px;">Pixel Color:
+      <span id="colorHex" style="color:#aaa">#??????</span>
+      <span class="color-swatch" id="colorSwatch"></span>
+    </div>
+    <div style="margin-top:6px; color:#aaa; font-size:11px;">
+      Click to <strong style="color:#ffd700">drop a pin</strong> and record coordinates.<br>
+      Right-click to mark a rectangle corner.<br>
+      Press <kbd style="background:#333;padding:2px 4px;border-radius:3px;">C</kbd> to clear all markers.
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <span>📍 Dropped Pins</span>
+      <div style="display:flex;gap:4px;">
+        <button class="btn" onclick="clearMarkers()">Clear</button>
+        <button class="btn" onclick="exportMarkers()">Copy JSON</button>
+      </div>
+    </div>
+    <div class="marker-list" id="markerList"></div>
+  </div>
+
+  <!-- Zoom view -->
+  <div class="info-box">
+    <div style="margin-bottom:6px;">🔍 Zoom (8x)</div>
+    <canvas id="zoom" class="zoom-box" width="200" height="200"></canvas>
+  </div>
+
+  <!-- Rectangle helper -->
+  <div class="info-box" id="rectHelper" style="display:none;">
+    <div style="color:#ff9900; margin-bottom:4px;">Rectangle in progress...</div>
+    <div id="rectInfo" style="font-size:11px; color:#aaa;"></div>
+  </div>
+
+  <div class="info-box">
+    <div style="margin-bottom:4px;">📋 Coordinate Log</div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+const FRONT_PATH = 'http://localhost:5174/id-inspector/id-template-front.png';
+const BACK_PATH  = 'http://localhost:5174/id-inspector/id-template-back.png';
+
+// We'll load from file:// using a data URL approach
+// Actually load from the server assets
+let currentTemplate = 'front';
+const canvas  = document.getElementById('canvas');
+const ctx     = canvas.getContext('2d');
+const zCanvas = document.getElementById('zoom');
+const zCtx    = zCanvas.getContext('2d');
+
+let img = new Image();
+let markers = [];
+let rectStart = null;
+let mouseX = 0, mouseY = 0;
+
+// Load templates as object URLs from fetch
+async function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = src;
+  });
+}
+
+async function switchTemplate(t) {
+  currentTemplate = t;
+  document.getElementById('tab-front').classList.toggle('active', t === 'front');
+  document.getElementById('tab-back').classList.toggle('active',  t === 'back');
+  await loadTemplate(t);
+}
+
+async function loadTemplate(t) {
+  const src = t === 'front' ? './id-template-front.png' : './id-template-back.png';
+  img = await loadImage(src);
+  canvas.width  = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  redraw();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+
+  // Draw markers
+  markers.forEach((m, i) => {
+    if (m.type === 'pin') {
+      ctx.strokeStyle = '#ffd700';
+      ctx.fillStyle   = 'rgba(255,215,0,0.3)';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(`${i+1}`, m.x + 8, m.y - 4);
+    } else if (m.type === 'rect') {
+      ctx.strokeStyle = '#ff4444';
+      ctx.fillStyle   = 'rgba(255,68,68,0.15)';
+      ctx.lineWidth   = 1.5;
+      ctx.strokeRect(m.x, m.y, m.w, m.h);
+      ctx.fillRect(m.x, m.y, m.w, m.h);
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(`R${i+1} ${m.w}×${m.h}`, m.x + 2, m.y - 3);
+    }
+  });
+
+  // Draw rect in progress
+  if (rectStart) {
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4, 2]);
+    const w = mouseX - rectStart.x;
+    const h = mouseY - rectStart.y;
+    ctx.strokeRect(rectStart.x, rectStart.y, w, h);
+    ctx.setLineDash([]);
+  }
+
+  // Crosshair
+  ctx.strokeStyle = 'rgba(0,212,255,0.6)';
+  ctx.lineWidth   = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(mouseX, 0); ctx.lineTo(mouseX, canvas.height);
+  ctx.moveTo(0, mouseY); ctx.lineTo(canvas.width, mouseY);
+  ctx.stroke();
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / r.width;
+  const scaleY = canvas.height / r.height;
+  mouseX = Math.round((e.clientX - r.left) * scaleX);
+  mouseY = Math.round((e.clientY - r.top)  * scaleY);
+
+  document.getElementById('pos').textContent = `X: ${mouseX}   Y: ${mouseY}`;
+
+  // Pixel color
+  const px = ctx.getImageData(mouseX, mouseY, 1, 1).data;
+  const hex = '#' + [px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,'0')).join('');
+  document.getElementById('colorHex').textContent = hex;
+  document.getElementById('colorSwatch').style.background = hex;
+
+  // Update rect helper
+  if (rectStart) {
+    const w = mouseX - rectStart.x;
+    const h = mouseY - rectStart.y;
+    document.getElementById('rectHelper').style.display = 'block';
+    document.getElementById('rectInfo').textContent =
+      `Start: (${rectStart.x}, ${rectStart.y})  Current: (${mouseX}, ${mouseY})\nSize: ${Math.abs(w)} × ${Math.abs(h)}`;
+  }
+
+  // Zoom
+  const ZS = 8, ZW = 200;
+  zCtx.clearRect(0, 0, ZW, ZW);
+  zCtx.imageSmoothingEnabled = false;
+  const sx = mouseX - Math.floor(ZW / ZS / 2);
+  const sy = mouseY - Math.floor(ZW / ZS / 2);
+  zCtx.drawImage(img, sx, sy, ZW/ZS, ZW/ZS, 0, 0, ZW, ZW);
+  // Draw center crosshair on zoom
+  zCtx.strokeStyle = 'rgba(255,0,0,0.8)';
+  zCtx.lineWidth = 1;
+  zCtx.beginPath();
+  zCtx.moveTo(ZW/2, 0); zCtx.lineTo(ZW/2, ZW);
+  zCtx.moveTo(0, ZW/2); zCtx.lineTo(ZW, ZW/2);
+  zCtx.stroke();
+
+  redraw();
+});
+
+canvas.addEventListener('click', (e) => {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / r.width;
+  const scaleY = canvas.height / r.height;
+  const x = Math.round((e.clientX - r.left) * scaleX);
+  const y = Math.round((e.clientY - r.top)  * scaleY);
+  const px = ctx.getImageData(x, y, 1, 1).data;
+  const hex = '#' + [px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,'0')).join('');
+
+  const label = prompt(`Label this pin (x=${x}, y=${y}):`, `pin_${markers.length+1}`) || `pin_${markers.length+1}`;
+  markers.push({ type:'pin', x, y, color: hex, label, template: currentTemplate });
+  addLog(`📍 ${label}: x=${x}, y=${y} ${hex}`);
+  updateMarkerList();
+  redraw();
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / r.width;
+  const scaleY = canvas.height / r.height;
+  const x = Math.round((e.clientX - r.left) * scaleX);
+  const y = Math.round((e.clientY - r.top)  * scaleY);
+
+  if (!rectStart) {
+    rectStart = { x, y };
+    addLog(`🔲 Rect start: (${x}, ${y})`);
+  } else {
+    const w = x - rectStart.x;
+    const h = y - rectStart.y;
+    const label = prompt(`Label this rect (${Math.abs(w)}×${Math.abs(h)}):`, `rect_${markers.length+1}`) || `rect_${markers.length+1}`;
+    markers.push({
+      type:'rect',
+      x: w < 0 ? x : rectStart.x,
+      y: h < 0 ? y : rectStart.y,
+      w: Math.abs(w), h: Math.abs(h),
+      label, template: currentTemplate
+    });
+    addLog(`🔲 ${label}: left=${markers[markers.length-1].x} top=${markers[markers.length-1].y} w=${Math.abs(w)} h=${Math.abs(h)}`);
+    rectStart = null;
+    document.getElementById('rectHelper').style.display = 'none';
+    updateMarkerList();
+    redraw();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'c' || e.key === 'C') clearMarkers();
+  if (e.key === 'Escape') { rectStart = null; document.getElementById('rectHelper').style.display='none'; redraw(); }
+});
+
+function clearMarkers() { markers = []; rectStart = null; updateMarkerList(); redraw(); }
+
+function updateMarkerList() {
+  const el = document.getElementById('markerList');
+  el.innerHTML = markers.map((m, i) => {
+    if (m.type === 'pin') {
+      return `<div class="marker"><span class="marker-label">📍 ${i+1}. ${m.label}</span><span class="marker-coord">x=${m.x} y=${m.y}</span></div>`;
+    } else {
+      return `<div class="marker"><span class="marker-label" style="color:#ff9988">🔲 ${i+1}. ${m.label}</span><span class="marker-coord">left=${m.x} top=${m.y} ${m.w}×${m.h}</span></div>`;
+    }
+  }).join('');
+}
+
+function addLog(msg) {
+  const log = document.getElementById('log');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.textContent = msg;
+  log.prepend(div);
+}
+
+function exportMarkers() {
+  const json = JSON.stringify(markers, null, 2);
+  navigator.clipboard.writeText(json).then(() => addLog('✅ Copied to clipboard!'));
+}
+
+// Initial load
+loadTemplate('front');
+</script>
+</body>
+</html>
