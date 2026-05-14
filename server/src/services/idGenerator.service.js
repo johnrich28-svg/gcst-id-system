@@ -391,7 +391,7 @@ async function renderPdfs({ personalInfo, uploads, outDir }) {
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-export const generateIdCard = async (requestId) => {
+export const generateIdCard = async (requestId, issuedById = null) => {
   const request = await IdRequest.findById(requestId);
   if (!request) throw new Error('Request not found');
 
@@ -405,7 +405,10 @@ export const generateIdCard = async (requestId) => {
 
   let rec = await GeneratedId.findOne({ requestId: request._id });
   if (rec) {
-    rec.frontPdfPath = frontPath; rec.backPdfPath = backPath; await rec.save();
+    rec.frontPdfPath = frontPath;
+    rec.backPdfPath = backPath;
+    if (issuedById) rec.issuedBy = issuedById;
+    await rec.save();
   } else {
     rec = await GeneratedId.create({
       requestId:       request._id,
@@ -421,11 +424,12 @@ export const generateIdCard = async (requestId) => {
       signatureUrl:    uploads?.signature || uploads?.signatureUrl,
       frontPdfPath:    frontPath,
       backPdfPath:     backPath,
+      issuedBy:        issuedById,
     });
   }
   request.status = 'GENERATED';
   await request.save();
-  return rec;
+  return rec.populate('issuedBy', 'name email');
 };
 
 export const regeneratePdf = async (generatedIdDocId) => {
@@ -450,4 +454,6 @@ export const regeneratePdf = async (generatedIdDocId) => {
 };
 
 export const getGeneratedIds = async (filters = {}) =>
-  GeneratedId.find(filters).sort({ issuedAt: -1 });
+  GeneratedId.find(filters)
+    .populate('issuedBy', 'name email')
+    .sort({ issuedAt: -1 });

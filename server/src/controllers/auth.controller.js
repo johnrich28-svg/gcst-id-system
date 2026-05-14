@@ -19,7 +19,7 @@ export const login = async (req, res, next) => {
     const token = generateToken(user._id);
     
     res.status(200).json(new ApiResponse(200, {
-      user: { id: user._id, email: user.email, role: user.role },
+      user: { id: user._id, email: user.email, name: user.name, role: user.role },
       token
     }, 'Login successful'));
   } catch (error) {

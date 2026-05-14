@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Printer, Download, Filter, FileText, Loader2, BookOpen, User2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Search, Printer, Download, Filter, FileText, Loader2, BookOpen, User2, RefreshCw, AlertTriangle, UserCheck } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { getGeneratedIds, downloadIdPdf } from '../../services/admin.service';
@@ -201,8 +201,14 @@ const GeneratedIDs = () => {
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-400 font-medium">
-                  Issued: {new Date(item.issuedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                <div className="flex flex-col gap-1 text-xs text-slate-400 font-medium">
+                  <span>Issued: {new Date(item.issuedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  {item.issuedBy && (
+                    <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                      <UserCheck size={12} />
+                      By: {item.issuedBy.name || item.issuedBy.email}
+                    </span>
+                  )}
                 </div>
 
                 {/* Download buttons */}

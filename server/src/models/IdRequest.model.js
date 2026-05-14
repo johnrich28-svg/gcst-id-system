@@ -61,6 +61,10 @@ const idRequestSchema = new mongoose.Schema({
   schedule: {
     releaseDate: Date,
     batchGroup: String
+  },
+  release: {
+    releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    releasedAt: { type: Date, default: null }
   }
 }, { timestamps: true });
 

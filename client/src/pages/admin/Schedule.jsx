@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Users, Clock, CheckCircle, Play, RefreshCw, ChevronDown, ChevronUp, Info, Download } from 'lucide-react';
+import { Calendar, Users, Clock, CheckCircle, Play, RefreshCw, ChevronDown, ChevronUp, Info, Download, UserCheck } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import { getBatches, runAutoBatch, updateBatchReleaseDate } from '../../services/admin.service';
@@ -208,6 +208,20 @@ const Schedule = () => {
                           ? new Date(batch.releaseDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
                           : 'TBA'}</b></span>
                       </div>
+                      {batch.status === 'RELEASED' && batch.releasedBy && (
+                        <div className="flex items-center gap-2 text-emerald-700">
+                          <UserCheck size={15} className="text-emerald-500" />
+                          <span>
+                            Released by{' '}
+                            <b>{batch.releasedBy.name || batch.releasedBy.email}</b>
+                            {batch.releasedAt && (
+                              <span className="text-slate-400 font-normal ml-1">
+                                · {new Date(batch.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Progress bar */}

@@ -91,7 +91,10 @@ export const autoBatchGeneratedIds = async () => {
 };
 
 export const getBatches = async (filters = {}) => {
-  return await Batch.find(filters).populate('requestIds').sort({ createdAt: -1 });
+  return await Batch.find(filters)
+    .populate('requestIds')
+    .populate('releasedBy', 'name email')
+    .sort({ createdAt: -1 });
 };
 
 export const setBatchReleaseDate = async (batchId, releaseDate) => {
@@ -110,19 +113,26 @@ export const setBatchReleaseDate = async (batchId, releaseDate) => {
   return batch;
 };
 
-export const releaseBatch = async (batchId) => {
+export const releaseBatch = async (batchId, releasedById = null) => {
   const batch = await Batch.findById(batchId);
   if (!batch) throw new Error('Batch not found');
 
+  const releasedAt = new Date();
   batch.status = 'RELEASED';
+  batch.releasedBy = releasedById;
+  batch.releasedAt = releasedAt;
   await batch.save();
 
   await IdRequest.updateMany(
     { _id: { $in: batch.requestIds } },
-    { status: 'RELEASED' }
+    {
+      status: 'RELEASED',
+      'release.releasedBy': releasedById,
+      'release.releasedAt': releasedAt
+    }
   );
 
-  return batch;
+  return await batch.populate('releasedBy', 'name email');
 };
 
 /**
